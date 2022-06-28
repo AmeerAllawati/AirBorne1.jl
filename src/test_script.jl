@@ -164,35 +164,48 @@ all_data = get_data("AMZN", "2018-01-01", "2021-01-01", "", "1d")
 adj_close = all_data[:, 6]
 vol = all_data[:, 7]
 
-# vol_train, vol_test = split_train_test(vol)
-# adj_close_train , adj_close_test = split_train_test(adj_close)
+vol_train, vol_test = split_train_test(vol)
+adj_close_train , adj_close_test = split_train_test(adj_close)
 
-# adj_close_standard = standardize(adj_close, adj_close_train)
-# vol_standard = standardize(vol, vol_train)
+adj_close_standard = standardize(adj_close, adj_close_train)
+vol_standard = standardize(vol, vol_train)
 
-# data_standard = [adj_close_standard vol_standard]
-# train_standard, test_standard = split_train_test(data_standard)
+data_standard = [adj_close_standard vol_standard]
+train_standard, test_standard = split_train_test(data_standard)
 
-# # do predictions for all
-# predictions = behavioural_prediction(data_standard, train_standard, test_standard, L, num_preds, γ)
-# pred_rescaled = rescale(predictions, adj_close_train)
-# # split adj close test values in half 
-# adj_close_test_1 = adj_close_test[1:floor(Int, size(adj_close_test, 1)/2)]
-# adj_close_test_2 = adj_close_test[floor(Int, size(adj_close_test, 1)/2)+1:size(adj_close_test, 1)]
+# do predictions for all
+predictions = behavioural_prediction(data_standard, train_standard, test_standard, L, num_preds, γ)
+pred_rescaled = rescale(predictions, adj_close_train)
+# split adj close test values in half 
+adj_close_test_1 = adj_close_test[1:floor(Int, size(adj_close_test, 1)/2)]
+adj_close_test_2 = adj_close_test[floor(Int, size(adj_close_test, 1)/2)+1:size(adj_close_test, 1)]
 
-# # split predictions in half 
-# clean = collect(skipmissing(pred_rescaled))
-# pred_rescaled_1 = clean[1:floor(Int, size(clean, 1)/2)]
-# pred_rescaled_2 = clean[floor(Int, size(clean, 1)/2)+1:size(clean, 1)]
+# split predictions in half 
+clean = collect(skipmissing(pred_rescaled))
+pred_rescaled_1 = clean[1:floor(Int, size(clean, 1)/2)]
+pred_rescaled_2 = clean[floor(Int, size(clean, 1)/2)+1:size(clean, 1)]
 
-# # calculate errors for all predictions and get the get the confidence interval
-# abs_matx, rel_matx, perc_matx= get_error_matrix(pred_rescaled, adj_close_test, adj_close_train)
+# calculate errors for all predictions and get the get the confidence interval
+# abs: true value - predictions
+abs_matx, rel_matx, perc_matx= get_error_matrix(pred_rescaled, adj_close_test, adj_close_train)
 
-# # get first half of error matrix 
-# rel_matx_1 = rel_matx[1:floor(Int, size(adj_close_test, 1)/2)]
-# normal, x, pdf, kde = est_distribution(rel_matx_1, 30)
-# lower, upper = get_confidence_int(normal, 0.9)
-# plot_histogram(rel_matx_1, normal, x, pdf, kde, lower, upper, "Relative", 30)
+# get first half of error matrix 
+rel_matx_1 = rel_matx[1:floor(Int, size(adj_close_test, 1)/2)]
+normal, x, pdf, kde = est_distribution(rel_matx_1, 30)
+lower, upper = get_confidence_int(normal, 0.9)
+#plot_histogram(rel_matx_1, normal, x, pdf, kde, lower, upper, "Relative", 30)
+
+# Confidence interval analysis
+# The negative values in the error matrices mean that prediction was higher
+# Buy strategy analysis
+negative_errors_index = findall(<=(0), rel_matx_1)
+negative_rel_errors = rel_matx[negative_errors_index]
+prediction_higher_percent = size(negative_rel_errors, 1)/size(rel_matx, 1) * 100 #This variable has the percentage of how many times the prediction is higher than the actual
+println("\n")
+println("The predictor predicts higher price than the actual price $prediction_higher_percent% of the times")
+
+avg_error_high_pred = 
+
 
 # # Then do the Buy sell strategy
 # holding = Holding(0, 0, 10000)
