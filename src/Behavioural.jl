@@ -117,7 +117,7 @@ function behavioural_prediction(data::Array, train_data::Array, test_data::Array
     size_wd = size(train_data, 1)-T
 
     for i in 1:size(test_data,1)+1
-        w_given = form_w_given(data[i+size_wd:i+size_wd+T-1, :])
+        w_given = form_w_given(data[i+size_wd:i+size_wd+T-1, :]) #Flatten the price and volume data
         tmp_preds = behavioural(data[i:i+size_wd-1, :], w_given, hankel_depth, T, γ)
         tmp_preds = Array(transpose(tmp_preds))
         empty_array[i, :] =  tmp_preds

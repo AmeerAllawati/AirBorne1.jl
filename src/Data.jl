@@ -31,7 +31,8 @@ function get_data(tickr::String, start::String, finish::String, range::String, i
     live_data = yfinance.download(tickr, start, finish, period = range, interval = int) #import data from any period desired
     info = Pandas.DataFrame(live_data) # Wrap in a pandas DataFrame
     info = Pandas.reset_index(info) # set the index 
-    info = DataFrames.DataFrame(info) # Convert to julia DataFrame
+    # info = DataFrames.DataFrame(info) # Convert to julia DataFrame
+    info = DataFrames.DataFrame([col => collect(info[col]) for col in info.pyo.columns])
     Pandas.display(info) # display
     all_data = info
     all_data # return data
