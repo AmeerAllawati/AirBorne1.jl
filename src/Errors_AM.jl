@@ -21,7 +21,6 @@ export get_error_vs_gamma
 export get_error_matrix
 export estimate_errors
 export errors
-export rescale
 export rescale_new
 
 function remove_first_i_vals(vector::Array, j::Int)
@@ -130,35 +129,12 @@ function get_error_vs_depth(all_data::Array, train_data::Array, rescaled_train_d
 end
 
 # Construct an error matrix from the predictions equal to the size of test data*num predictions ahead
-function get_error_matrix(predictions::Any, test_data::Array, train_data::Array) 
-    # remove all missing values and last value from the predictions
-    if (size(predictions, 1) != size(test_data, 1))
-        pred_clean = remove_last_i_vals(predictions, size(predictions, 2))
-        pred_clean = pred_clean[size(train_data, 1)+1:size(pred_clean,1), :]
-    else 
-        pred_clean = predictions
-    end
-
-    perc_matrix = Array{Union{Float64, Missing}}(undef, size(test_data,1), size(predictions, 2))
-    rel_matrix = Array{Union{Float64, Missing}}(undef, size(test_data,1), size(predictions, 2))
-    abs_matrix = Array{Union{Float64, Missing}}(undef, size(test_data,1), size(predictions, 2))
-
-    for i = 1:size(pred_clean, 1)
-        for j = 1:size(pred_clean, 2)
-            if (i+j-1 > size(test_data, 1)) 
-                perc_matrix[i, j] = missing
-                rel_matrix[i, j] = missing
-                abs_matrix[i, j] = missing
-            else 
-                abs, rel, perc = errors(pred_clean[i, j], test_data[i+j-1, 1])
-                perc_matrix[i, j] = perc
-                rel_matrix[i,j] = rel
-                abs_matrix[i,j] = abs
-            end
-        end
-    end
-    abs_matrix, rel_matrix, perc_matrix
+function get_error_matrix(predictions::Any, test_data) 
+    rel_errors = abs.(test_data-predictions)./predictions
+    return rel_errors
 end
+
+
 
 # retrieve the avg error form error matrix
 function get_avg_error(error_matrix::Matrix) 
@@ -172,16 +148,6 @@ function get_avg_error(error_matrix::Matrix)
 end
 
 # in order to calculate errors better, need to rescale data
-function rescale(array::Array, train_data::Array) 
-    empty_array = copy(array)
-    for i=1:size(array, 2)
-        for j=1:size(array, 1)
-            empty_array[j, i] = (empty_array[j, i]*Statistics.std(train_data)) + Statistics.mean(train_data) #a add back mean and multiply by std dev
-        end
-    end
-    empty_array
-end
-
 function rescale_new(array::Array, train_data) 
     empty_array = copy(array)
     empty_array = (empty_array.*Statistics.std(train_data)) .+ Statistics.mean(train_data) #a add back mean and multiply by std dev

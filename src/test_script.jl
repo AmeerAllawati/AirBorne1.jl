@@ -14,8 +14,8 @@ include("Buy_sell.jl")
 
 # # Simple vs ML -------------------------------------------------------------------------
 
-all_data = get_data("AAPL", "2016-07-11", "2021-07-10", "", "1d")
-adj_close = all_data[:, 6]
+# all_data = get_data("AAPL", "2016-07-11", "2021-07-10", "", "1d")
+# adj_close = all_data[:, 6]
 
 # adj_close_norm = normalize(adj_close)
 # train, test = split_train_test(adj_close_norm)
@@ -55,8 +55,8 @@ adj_close = all_data[:, 6]
 
 ## Simple vs Behavioural
 
-all_data = get_data("AMZN", "2018-01-01", "2021-01-01", "", "1d")
-adj_close = all_data[:, 6]
+# all_data = get_data("AMZN", "2018-01-01", "2021-01-01", "", "1d")
+# adj_close = all_data[:, 6]
 
 # Previous price values only 
 
@@ -128,9 +128,9 @@ adj_close = all_data[:, 6]
 
 # Using Previous Price AND Volume Data ------------------------------------------------------------------------------
 
-all_data = get_data("AMZN", "2018-01-01", "2021-01-01", "", "1d")
-adj_close = all_data[:, 6]
-vol = all_data[:, 7]
+# all_data = get_data("AMZN", "2018-01-01", "2021-01-01", "", "1d")
+# adj_close = all_data[:, 6]
+# vol = all_data[:, 7]
 
 # vol_train, vol_test = split_train_test(vol)
 # adj_close_train , adj_close_test = split_train_test(adj_close)
@@ -164,49 +164,85 @@ all_data = get_data("AMZN", "2018-01-01", "2021-01-01", "", "1d")
 adj_close = all_data[:, 6]
 vol = all_data[:, 7]
 
-vol_train, vol_test = split_train_test(vol)
-adj_close_train , adj_close_test = split_train_test(adj_close)
+# adj_close_new = all_data[:, 6]'
+# vol_new = all_data[:, 7]'
+
+vol_train, vol_test = split_train_test(vol, "row")
+adj_close_train , adj_close_test = split_train_test(adj_close, "row")
+
+# vol_train_new, vol_test_new = split_train_test(vol_new, "column")
+# adj_close_train_new , adj_close_test_new = split_train_test(adj_close_new, "column")
 
 adj_close_standard = standardize(adj_close, adj_close_train)
 vol_standard = standardize(vol, vol_train)
 
+# adj_close_standard_new = standardize(adj_close_new, adj_close_train_new)
+# vol_standard_new = standardize(vol_new, vol_train_new)
+
 data_standard = [adj_close_standard vol_standard]
-train_standard, test_standard = split_train_test(data_standard)
+train_standard, test_standard = split_train_test(data_standard, "row")
+
+# data_standard_new = [adj_close_standard_new ; vol_standard_new]
+# train_standard_new, test_standard_new = split_train_test(data_standard_new, "column")
+
 
 # do predictions for all
 predictions = behavioural_prediction(data_standard, train_standard, test_standard, L, num_preds, γ)
 pred_rescaled = rescale(predictions, adj_close_train)
-# split adj close test values in half 
-adj_close_test_1 = adj_close_test[1:floor(Int, size(adj_close_test, 1)/2)]
-adj_close_test_2 = adj_close_test[floor(Int, size(adj_close_test, 1)/2)+1:size(adj_close_test, 1)]
+
+# predictions_new = behavioural_prediction_new(data_standard_new, train_standard_new, test_standard_new, L, num_preds, γ)
+# pred_rescaled_new = rescale_new(predictions_new, adj_close_train_new)
+# # split adj close test values in half 
+# adj_close_test_1 = adj_close_test[1:floor(Int, size(adj_close_test, 1)/2)]
+# adj_close_test_2 = adj_close_test[floor(Int, size(adj_close_test, 1)/2)+1:size(adj_close_test, 1)]
 
 # split predictions in half 
 clean = collect(skipmissing(pred_rescaled))
-pred_rescaled_1 = clean[1:floor(Int, size(clean, 1)/2)]
-pred_rescaled_2 = clean[floor(Int, size(clean, 1)/2)+1:size(clean, 1)]
+# clean_new = collect(skipmissing(pred_rescaled_new))
+
+# if (clean == clean_new)
+#     println("Wohooo!")
+# else
+#     println("So sad")
+# end
+# pred_rescaled_1 = clean[1:floor(Int, size(clean, 1)/2)]
+# pred_rescaled_2 = clean[floor(Int, size(clean, 1)/2)+1:size(clean, 1)]
+
+
 
 # calculate errors for all predictions and get the get the confidence interval
 # abs: true value - predictions
-abs_matx, rel_matx, perc_matx= get_error_matrix(pred_rescaled, adj_close_test, adj_close_train)
+# abs_matx, rel_matx, perc_matx= get_error_matrix(pred_rescaled, adj_close_test, adj_close_train)
 
-# get first half of error matrix 
-rel_matx_1 = rel_matx[1:floor(Int, size(adj_close_test, 1)/2)]
-normal, x, pdf, kde = est_distribution(rel_matx_1, 30)
-lower, upper = get_confidence_int(normal, 0.9)
+# # get first half of error matrix 
+# rel_matx_1 = rel_matx[1:floor(Int, size(adj_close_test, 1)/2)]
+# normal, x, pdf, kde = est_distribution(rel_matx_1, 30)
+# lower, upper = get_confidence_int(normal, 0.9)
 #plot_histogram(rel_matx_1, normal, x, pdf, kde, lower, upper, "Relative", 30)
 
 # Confidence interval analysis
 # The negative values in the error matrices mean that prediction was higher
 # Buy strategy analysis
-negative_errors_index = findall(<=(0), rel_matx_1)
-negative_rel_errors = rel_matx[negative_errors_index]
-prediction_higher_percent = size(negative_rel_errors, 1)/size(rel_matx, 1) * 100 #This variable has the percentage of how many times the prediction is higher than the actual
-println("\n")
-println("The predictor predicts higher price than the actual price $prediction_higher_percent% of the times")
+# confidence_interval_analysis(num_preds, rel_matx_1)
+# negative_errors_index = findall(<=(0), rel_matx_1)
+# negative_rel_errors = rel_matx[negative_errors_index]
+# prediction_higher_percent = size(negative_rel_errors, 1)/size(rel_matx, 1) * 100 #This variable has the percentage of how many times the prediction is higher than the actual
+# println("\n")
+# println("Considering 1 day ahead predictions, the predictor predicts higher price than the actual price $prediction_higher_percent% of the times\n")
 
-avg_error_high_pred = 
+# abs_avg_error_high_pred = abs(mean(rel_matx_1))
+# println("With an average of $abs_avg_error_high_pred% higher")
+# percent90_confidence_index = findall(>=(-0.01), negative_rel_errors) #This variable gets the indices for which the values are within 10% of the actual value
+# percent90_confidence = negative_rel_errors[percent90_confidence_index]
 
+# println("Within 10% (confidence interval of 90%): ")
+# println(size(percent90_confidence,1)/size(negative_rel_errors,1)*100)
 
+# percent70_confidence_index = findall(>=(-0.03), negative_rel_errors)
+# percent70_confidence = negative_rel_errors[percent70_confidence_index]
+
+# println("Within 30% (confidence interval of 70%): ")
+# println(size(percent70_confidence,1)/size(negative_rel_errors,1)*100)
 # # Then do the Buy sell strategy
 # holding = Holding(0, 0, 10000)
 # holding, value, curr_price = buy_sell_hold(holding, upper, lower, 0.0, 0.0, pred_rescaled_2, adj_close_test_1, adj_close_test_2, 0.001)

@@ -20,30 +20,54 @@ export hankel_scalar
 export Lasso
 export find_w_given
 export behavioural
+export behavioural_new
 export behavioural_prediction
+export form_w_given_new
 
-function hankel_vector(w_given::Array, L::Int) 
-    Tmin = (size(w_given, 2) + 1)*L-1
-    Lmax = (size(w_given, 1)+1)/size(w_given, 2)+1
-    length = size(w_given, 1)
+function hankel_vector(w_d::Array, L::Any) 
+    L = convert(Int64, L)
+    dim = size(w_d, 2) #Dimension (how many signals used)
+    Tmin = (dim + 1)*L-1 #T_min=(m + 1)*L - 1
+    T = size(w_d, 1) #Trajectory time length
+    Lmax = (T+1)/(dim+1) #L_max = floor (T+1)/(q+1)
 
-    if(length < Tmin) || (L > Lmax)
-        println("Min length is $Tmin, length of matrix is $length")
+    if(T < Tmin) || (L > Lmax)
+        println("Min length is $Tmin, length of matrix is $T")
         println("Max depth is $Lmax, depth selected is $L")
         return 
     else
-        hank = Array{Float64}(undef, size(w_given, 2)*L, (size(w_given,1)-L+1))
-        for i=1:size(w_given, 2)
-            hank_temp = hankel_scalar(w_given[:, i], L)
+        hank = Array{Float64}(undef, size(w_d, 2)*L, (size(w_d,1)-L+1))
+        for i=1:size(w_d, 2)
+            hank_temp = hankel_scalar(w_d[:, i], L)
             if (size(hank) == size(hank_temp))
                 hank = hank_temp
             else
                 row_count = 1
                 for j = 1:size(hank_temp, 1)
                     hank[row_count+i-1, :] = hank_temp[j, :]
-                    row_count = row_count + size(w_given, 2)
+                    row_count = row_count + size(w_d, 2)
                 end
             end
+        end
+    end
+    hank
+end
+
+function hankel_vector_new(w_d::Array, L::Any) 
+    L = convert(Int64, L)
+    dim = size(w_d, 1) #Dimension (how many signals used)
+    Tmin = (dim + 1)*L-1 #T_min=(m + 1)*L - 1
+    T = size(w_d, 2) #Trajectory time length
+    Lmax = floor((T+1)/(dim+1)) #L_max = floor (T+1)/(q+1)
+
+    if(T < Tmin) || (L > Lmax)
+        println("Min length is $Tmin, length of matrix is $T")
+        println("Max depth is $Lmax, depth selected is $L")
+        return 
+    else
+        hank = Array{Float64}(undef, dim*L, (T-L+1))
+        for i=1:L
+            hank[(i-1)*dim+1:(i-1)*dim+dim, :] = w_d[:, i:T-L+i]
         end
     end
     hank
@@ -94,9 +118,9 @@ function find_w_given(traj, times)
 end
 
 function behavioural(wd, w_given, L, T, γ)
-    t_given = 1:size(wd, 2)*T
+    t_given = 1:size(wd, 2)*T #Potentially size(w_given, 1)?
     hank = hankel_vector(wd, L)
-    print(size(hank))
+    #print(size(hank))
 
     b_opt, b_ls = Lasso(w_given, hank[t_given, :], γ) 
     values = hank*b_opt
@@ -111,14 +135,63 @@ function behavioural(wd, w_given, L, T, γ)
     return adj_close_predictions
 end 
 
-function behavioural_prediction(data::Array, train_data::Array, test_data::Array, hankel_depth::Int, num_preds::Int, γ)
+function behavioural_new(wd, w_given, L, T, γ)
+    t_given = 1:size(w_given, 1) #Potentially size(w_given, 1)?
+    hank = hankel_vector_new(wd, L)
+    #print(size(hank))
+
+    b_opt, b_ls = Lasso(w_given, hank[t_given, :], γ) 
+    values = hank*b_opt
+
+    predictions = values[(size(wd, 1)*T)+1:size(wd, 1)*L]
+    # if the hankel matrix and w_given contain more than just price data we need to 
+    # extract only the adj close values since "prediction" will contain prediction values for 
+    # all data used e.g will contain adj_close and volume predictions
+
+    adj_close_predictions = get_adj_close_predictions(predictions, size(wd, 1))
+
+    return adj_close_predictions
+end 
+
+function behavioural_prediction(data::Array, train_data::Array, test_data::Array, hankel_depth::Any, num_preds::Int, γ)
+    #data is the concatenation of whatever signals is being used
+    #train_data is the first 2/3 of the data
+    #test_data is the remaining 1/3 of data. Really train is being used to get the best parameters
+    hankel_depth = convert(Int64, hankel_depth)
     empty_array = Array{Float64}(undef, size(test_data,1)+1, num_preds)
-    T = hankel_depth-num_preds 
+    #Empty array is a place holder for the predictions of these days, +1 because you predict on a moving
+    # window so you can predict for the interval after the "train_data"
+    T = hankel_depth-num_preds #Size of w_given (t_given)
     size_wd = size(train_data, 1)-T
 
     for i in 1:size(test_data,1)+1
-        w_given = form_w_given(data[i+size_wd:i+size_wd+T-1, :]) #Flatten the price and volume data
+        w_given = form_w_given(data[i+size_wd:i+size(train_data, 1)-1, :]) #Flatten the price and volume data
+        #w_given could be improved, the problem with reshape is that it is column major
         tmp_preds = behavioural(data[i:i+size_wd-1, :], w_given, hankel_depth, T, γ)
+        tmp_preds = Array(transpose(tmp_preds))
+        empty_array[i, :] =  tmp_preds
+    end
+    tmp_miss = Array{Union{Missing, Int}}(missing, size(train_data, 1), num_preds)
+    predictions = empty_array
+    predictions = (vcat(tmp_miss, empty_array))
+    predictions
+end
+
+function behavioural_prediction_new(data::Array, train_data::Array, test_data::Array, hankel_depth::Any, num_preds::Int, γ)
+    #data is the concatenation of whatever signals is being used
+    #train_data is the first 2/3 of the data
+    #test_data is the remaining 1/3 of data. Really train is being used to get the best parameters
+    hankel_depth = convert(Int64, hankel_depth)
+    empty_array = Array{Float64}(undef, size(test_data,2)+1, num_preds)
+    #Empty array is a place holder for the predictions of these days, +1 because you predict on a moving
+    # window so you can predict for the interval after the "train_data"
+    w_given_size = hankel_depth-num_preds #Size of w_given (t_given)
+    size_wd = size(train_data, 2)-w_given_size
+
+    for i in 1:size(test_data,2)+1
+        w_given = form_w_given_new(data[:,i+size_wd:i+size(train_data, 2)-1]) #Flatten the price and volume data
+        #w_given could be improved, the problem with reshape is that it is column major
+        tmp_preds = behavioural_new(data[:, i:i+size_wd-1], w_given, hankel_depth, w_given_size, γ)
         tmp_preds = Array(transpose(tmp_preds))
         empty_array[i, :] =  tmp_preds
     end
@@ -137,6 +210,12 @@ function form_w_given(array::Array)
             counter = counter + 1
         end
     end
+    empty_array
+end
+
+function form_w_given_new(array::Array)
+    empty_array = Array{Float64}(undef, size(array, 1)*size(array, 2), 1) 
+    empty_array = reshape(array, (size(array, 1)*size(array, 2), 1))
     empty_array
 end
 

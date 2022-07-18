@@ -20,6 +20,7 @@ export get_data
 export standardize
 export form_matrix_of_data
 
+
 numpy = pyimport("numpy")
 pandas = pyimport("pandas")
 yfinance = pyimport("yfinance")
@@ -44,13 +45,21 @@ function standardize(data, train)
     standardized
 end
 
-# get_train_data selects the first 2/3 of data from get_data
-function split_train_test(df)
-    train_data = df[1:floor(Int64,size(df,1)*2/3), :]
-    test_data = df[floor(Int64,size(df,1)*2/3)+1:size(df,1),:]
+# This function splits the data based on the user defined major. Either split by the rows
+# or by columns. The first 2/3 of the data used for constructing the hankel matrix and the last
+# 1/3 is used for calculating the relative errors then the standard deviation
+function split_train_test(df, splitting_type::String)
+    if (splitting_type == "row")
+        train_data = df[1:floor(Int64,size(df,1)*2/3), :]
+        test_data = df[floor(Int64,size(df,1)*2/3)+1:size(df,1),:]
+    else
+        train_data = df[:, 1:floor(Int64,size(df,2)*2/3)]
+        test_data = df[:, floor(Int64,size(df,2)*2/3)+1:size(df,2)]
+    end
     
     train_data, test_data
 end
+
 
 function normalize(data::Array)
     dt = fit(UnitRangeTransform, data)
